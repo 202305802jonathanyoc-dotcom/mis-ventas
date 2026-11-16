@@ -1,0 +1,120 @@
+:root {
+  --rosa: #b4235a;
+  --rosa-claro: #fde8ef;
+  --fondo: #fff7fa;
+  --texto: #2a1a20;
+  --gris: #6f5d64;
+  --borde: #ecd5dd;
+  --verde: #1f7a4d;
+  --verde-claro: #e3f4ea;
+  --rojo: #c0392b;
+  --rojo-claro: #fdecea;
+  --naranja: #b85c00;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--fondo); color: var(--texto); }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 19px; line-height: 1.4; }
+
+#barra {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--rosa); color: #fff;
+  padding: 12px 14px; padding-top: calc(12px + env(safe-area-inset-top));
+}
+#barra h1 { font-size: 22px; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#btnAtras { background: rgba(255,255,255,.18); color: #fff; border: 0; border-radius: 12px; font-size: 26px; width: 46px; height: 46px; }
+#btnAtras[hidden] { display: none; }
+
+main { padding: 16px; padding-bottom: 120px; max-width: 640px; margin: 0 auto; }
+.cargando { text-align: center; color: var(--gris); margin-top: 40px; }
+
+h2 { font-size: 21px; margin: 22px 0 10px; }
+.sub { color: var(--gris); font-size: 16px; }
+
+/* Tarjetas de resumen */
+.resumen { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cifra { background: #fff; border: 1px solid var(--borde); border-radius: 16px; padding: 14px; }
+.cifra b { display: block; font-size: 25px; }
+.cifra span { color: var(--gris); font-size: 15px; }
+.cifra.deuda b { color: var(--rojo); }
+.cifra.venta b { color: var(--verde); }
+
+/* Botones grandes del menú */
+.menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.menu button { min-height: 92px; font-size: 18px; flex-direction: column; gap: 4px; }
+.menu button .ico { font-size: 30px; line-height: 1; }
+
+button, .boton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: inherit; font-weight: 600; text-decoration: none;
+  border: 0; border-radius: 14px; padding: 14px 18px; min-height: 54px;
+  background: #fff; color: var(--texto); border: 2px solid var(--borde);
+}
+button:active, .boton:active { transform: scale(.98); }
+.principal { background: var(--rosa); color: #fff; border-color: var(--rosa); }
+.verde { background: #25a35a; color: #fff; border-color: #25a35a; }
+.peligro { color: var(--rojo); border-color: #f2c2bd; background: #fff; }
+.ancho { width: 100%; }
+.fila-botones { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.fila-botones > * { flex: 1 1 140px; }
+.chico { min-height: 40px; padding: 6px 12px; font-size: 16px; border-radius: 10px; }
+
+/* Listas */
+.lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.item {
+  background: #fff; border: 1px solid var(--borde); border-radius: 14px; padding: 14px;
+  display: flex; align-items: center; gap: 12px;
+}
+.item.toca { cursor: pointer; }
+.item.toca:active { background: var(--rosa-claro); }
+.item .info { flex: 1; min-width: 0; }
+.item .info b { display: block; overflow-wrap: anywhere; }
+.item .info small { color: var(--gris); font-size: 15px; }
+.monto { font-weight: 700; white-space: nowrap; }
+.monto.rojo { color: var(--rojo); }
+.monto.verde { color: var(--verde); }
+.vacio { text-align: center; color: var(--gris); padding: 22px 10px; background: #fff; border: 1px dashed var(--borde); border-radius: 14px; }
+.etiqueta { display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--rosa-claro); color: var(--rosa); }
+.etiqueta.vieja { background: #fff1de; color: var(--naranja); }
+
+/* Formularios */
+label { display: block; font-weight: 600; margin: 14px 0 6px; }
+input, select, textarea {
+  width: 100%; font: inherit; padding: 13px 14px; border-radius: 12px;
+  border: 2px solid var(--borde); background: #fff; color: var(--texto);
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--rosa); }
+.buscar { position: sticky; top: 72px; z-index: 3; background: var(--fondo); padding: 6px 0; }
+
+/* Carrito del pedido */
+.cantidad { display: flex; align-items: center; gap: 6px; }
+.cantidad button { width: 44px; min-height: 44px; padding: 0; font-size: 24px; border-radius: 12px; }
+.cantidad span { min-width: 26px; text-align: center; font-weight: 700; }
+.total-fijo {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  background: #fff; border-top: 2px solid var(--borde);
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 12px; box-shadow: 0 -4px 14px rgba(0,0,0,.06);
+}
+.total-fijo .t { flex: 1; }
+.total-fijo .t small { color: var(--gris); display: block; font-size: 14px; }
+.total-fijo .t b { font-size: 26px; }
+
+/* Ficha de clienta */
+.saldo-grande { text-align: center; background: #fff; border: 1px solid var(--borde); border-radius: 18px; padding: 18px; }
+.saldo-grande b { font-size: 38px; display: block; }
+.saldo-grande.debe b { color: var(--rojo); }
+.saldo-grande.aldia b { color: var(--verde); }
+
+.detalle-pedido { font-size: 16px; color: var(--gris); margin-top: 6px; }
+.detalle-pedido div { display: flex; justify-content: space-between; gap: 8px; }
+
+.banner { border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; font-size: 16px; }
+.banner.alerta { background: #fff1de; color: #6b3a00; }
+.banner.info { background: var(--rosa-claro); color: #6d1236; }
+
+#aviso {
+  position: fixed; left: 16px; right: 16px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 10;
+  background: #2a1a20; color: #fff; padding: 14px 16px; border-radius: 14px; text-align: center; font-weight: 600;
+}
+.oculto { display: none !important; }
