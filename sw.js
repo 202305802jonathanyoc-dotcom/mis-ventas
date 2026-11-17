@@ -1,5 +1,5 @@
 // Guarda la app en el teléfono para que funcione sin internet
-const CACHE = 'mis-ventas-v1';
+const CACHE = 'mis-ventas-v2';
 const ARCHIVOS = ['./', './index.html', './style.css', './app.js', './sql-wasm.js', './sql-wasm.wasm',
   './manifest.json', './icon-192.png', './icon-512.png'];
 

@@ -118,3 +118,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--r
   background: #2a1a20; color: #fff; padding: 14px 16px; border-radius: 14px; text-align: center; font-weight: 600;
 }
 .oculto { display: none !important; }
+
+/* Productos que no vinieron */
+.detalle-pedido .linea { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px dashed var(--borde); }
+.detalle-pedido .linea:first-child { border-top: 0; }
+.detalle-pedido .linea .txt { flex: 1; min-width: 0; }
+.detalle-pedido .linea .precio { white-space: nowrap; }
+.detalle-pedido .novino .txt, .detalle-pedido .novino .precio { text-decoration: line-through; opacity: .65; }
+.detalle-pedido .novino .etiqueta { text-decoration: none; display: inline-block; }
+.mini { min-height: 34px; padding: 4px 8px; font-size: 13px; white-space: nowrap; }

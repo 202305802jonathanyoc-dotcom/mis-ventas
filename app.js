@@ -94,6 +94,9 @@ function nombreMes(d = new Date()) { return `${MESES[d.getMonth()]} ${d.getFullY
 function prepararBase() {
   db.run('PRAGMA foreign_keys = ON;');
   db.run(ESQUEMA);
+  // v2: marcar productos que no vinieron (no se cobran pero quedan en el historial)
+  if (!q('PRAGMA table_info(detalle_pedido)').some(c => c.name === 'no_vino'))
+    db.run('ALTER TABLE detalle_pedido ADD COLUMN no_vino INTEGER NOT NULL DEFAULT 0');
   if (!q1('SELECT id FROM campanias WHERE activa=1')) {
     run('INSERT INTO campanias(nombre,fecha_inicio,activa) VALUES(?,?,1)', [nombreMes(), hoy()]);
   }
@@ -443,7 +446,13 @@ function fichaClienta(id, recien) {
           <div class="info"><b>${fechaBonita(p.fecha)}</b><small>${esc(p.camp)}${p.nota ? ' · ' + esc(p.nota) : ''}</small></div>
           <span class="monto">${Q(p.total)}</span>
         </div>
-        <div class="detalle-pedido">${detalle(p.id).map(d => `<div><span>${d.cantidad} × ${esc(d.nombre)}${d.codigo ? ' (' + esc(d.codigo) + ')' : ''}</span><span>${Q(d.precio * d.cantidad)}</span></div>`).join('')}</div>
+        <div class="detalle-pedido">${detalle(p.id).map(d => `
+          <div class="linea ${d.no_vino ? 'novino' : ''}">
+            <span class="txt">${d.cantidad} × ${esc(d.nombre)}${d.codigo ? ' (' + esc(d.codigo) + ')' : ''}
+              ${d.no_vino ? '<span class="etiqueta vieja">No vino</span>' : ''}</span>
+            <span class="precio">${Q(d.precio * d.cantidad)}</span>
+            <button class="chico mini" onclick="marcarNoVino(${d.id},${c.id})">${d.no_vino ? '↩️ Sí vino' : '🚫 No vino'}</button>
+          </div>`).join('')}</div>
         <div class="fila-botones"><button class="chico" onclick="enviarPedido(${p.id})">📲 Enviar</button><button class="chico peligro" onclick="borrarPedido(${p.id},${c.id})">🗑️ Borrar</button></div>
       </li>`).join('')}</ul>` : '<div class="vacio">Sin pedidos todavía.</div>'}
 
@@ -454,6 +463,33 @@ function fichaClienta(id, recien) {
         <button class="chico peligro" onclick="borrarPago(${p.id},${c.id})">🗑️</button></li>`).join('')}</ul>`
       : '<div class="vacio">Sin pagos todavía.</div>'}
   `);
+}
+
+// Marca un producto como "no vino": no se cobra, pero queda en el historial
+async function marcarNoVino(did, cid) {
+  const d = q1('SELECT * FROM detalle_pedido WHERE id=?', [did]);
+  if (d.no_vino) {
+    run('UPDATE detalle_pedido SET no_vino=0 WHERE id=?', [did]);
+  } else {
+    let faltan = d.cantidad;
+    if (d.cantidad > 1) {
+      const r = prompt(`Pidió ${d.cantidad}. ¿Cuántos NO vinieron?`, d.cantidad);
+      if (r === null) return;
+      faltan = parseInt(r, 10);
+      if (!(faltan >= 1 && faltan <= d.cantidad)) return aviso('Cantidad no válida');
+    }
+    if (faltan === d.cantidad) run('UPDATE detalle_pedido SET no_vino=1 WHERE id=?', [did]);
+    else {   // separa la línea: los que sí vinieron y los que no
+      run('UPDATE detalle_pedido SET cantidad=? WHERE id=?', [d.cantidad - faltan, did]);
+      run('INSERT INTO detalle_pedido(pedido_id,codigo,nombre,precio,cantidad,no_vino) VALUES(?,?,?,?,?,1)',
+        [d.pedido_id, d.codigo, d.nombre, d.precio, faltan]);
+    }
+  }
+  run(`UPDATE pedidos SET total=(SELECT IFNULL(SUM(precio*cantidad),0) FROM detalle_pedido
+       WHERE pedido_id=? AND no_vino=0) WHERE id=?`, [d.pedido_id, d.pedido_id]);
+  await guardar();
+  aviso(d.no_vino ? '↩️ Se volvió a cobrar' : '🚫 Marcado como "no vino". Ya no se cobra.');
+  fichaClienta(cid);
 }
 
 async function borrarPedido(pid, cid) {
@@ -476,7 +512,10 @@ function enviarPedido(pid) {
   const items = q('SELECT * FROM detalle_pedido WHERE pedido_id=?', [pid]);
   const saldo = saldoDe(p.cid);
   let t = `Hola ${p.nombre} 👋\nLe comparto el detalle de su pedido del ${fechaBonita(p.fecha)}:\n\n`;
-  t += items.map(i => `• ${i.cantidad} x ${i.nombre}${i.codigo ? ' (cód. ' + i.codigo + ')' : ''} — ${Q(i.precio * i.cantidad)}`).join('\n');
+  const linea = i => `• ${i.cantidad} x ${i.nombre}${i.codigo ? ' (cód. ' + i.codigo + ')' : ''} — ${Q(i.precio * i.cantidad)}`;
+  const vino = items.filter(i => !i.no_vino), noVino = items.filter(i => i.no_vino);
+  t += vino.length ? vino.map(linea).join('\n') : '(ningún producto)';
+  if (noVino.length) t += `\n\n🚫 *No vino* (no se le cobra):\n` + noVino.map(i => `• ${i.cantidad} x ${i.nombre}${i.codigo ? ' (cód. ' + i.codigo + ')' : ''}`).join('\n');
   t += `\n\n*Total del pedido: ${Q(p.total)}*`;
   if (Math.abs(saldo - p.total) > 0.009) t += `\n*Saldo pendiente total: ${Q(saldo)}*`;
   abrirWhatsApp(p.telefono, t + firma());
@@ -689,7 +728,10 @@ function historialMes(id) {
                         FROM pedidos p JOIN clientes cl ON cl.id=p.cliente_id
                         WHERE p.campania_id=? GROUP BY cl.id ORDER BY total DESC`, [c.id]);
   const top = q(`SELECT d.codigo, d.nombre, SUM(d.cantidad) AS cant FROM detalle_pedido d JOIN pedidos p ON p.id=d.pedido_id
-                 WHERE p.campania_id=? GROUP BY d.codigo, d.nombre ORDER BY cant DESC LIMIT 5`, [c.id]);
+                 WHERE p.campania_id=? AND d.no_vino=0 GROUP BY d.codigo, d.nombre ORDER BY cant DESC LIMIT 5`, [c.id]);
+  const noVino = q(`SELECT d.codigo, d.nombre, d.cantidad, cl.nombre AS clienta, cl.id AS cid, p.fecha
+                    FROM detalle_pedido d JOIN pedidos p ON p.id=d.pedido_id JOIN clientes cl ON cl.id=p.cliente_id
+                    WHERE p.campania_id=? AND d.no_vino=1 ORDER BY p.fecha, cl.nombre`, [c.id]);
   pantalla(c.nombre, `
     <p class="sub" style="margin-top:0">${fechaBonita(c.fecha_inicio)}${c.fecha_cierre ? ' – ' + fechaBonita(c.fecha_cierre) : ' (abierto)'}</p>
     <div class="resumen">
@@ -703,6 +745,9 @@ function historialMes(id) {
         <span class="monto">${Q(x.total)}</span></li>`).join('')}</ul>` : '<div class="vacio">Sin pedidos en este mes.</div>'}
     ${top.length ? `<h2>Lo más vendido</h2><ul class="lista">${top.map(t => `
       <li class="item"><div class="info"><b>${esc(t.nombre)}</b><small>${t.codigo ? 'Código ' + esc(t.codigo) : ''}</small></div><span class="monto">${t.cant} u.</span></li>`).join('')}</ul>` : ''}
+    ${noVino.length ? `<h2>🚫 No vinieron (${noVino.reduce((s, x) => s + x.cantidad, 0)})</h2><ul class="lista">${noVino.map(x => `
+      <li class="item toca" onclick="ir('clienta/${x.cid}')"><div class="info"><b>${x.cantidad} × ${esc(x.nombre)}</b>
+        <small>${esc(x.clienta)} · ${fechaBonita(x.fecha)}${x.codigo ? ' · Cód. ' + esc(x.codigo) : ''}</small></div></li>`).join('')}</ul>` : ''}
   `);
 }
 
@@ -714,12 +759,14 @@ function descargar(nombre, contenido, tipo) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 function exportarPedidosCSV(cid) {
-  const filas = q(`SELECT p.fecha, cl.nombre AS clienta, d.codigo, d.nombre AS producto, d.cantidad, d.precio, d.cantidad*d.precio AS subtotal
+  const filas = q(`SELECT p.fecha, cl.nombre AS clienta, d.codigo, d.nombre AS producto, d.cantidad, d.precio,
+                   CASE WHEN d.no_vino=1 THEN 0 ELSE d.cantidad*d.precio END AS subtotal,
+                   CASE WHEN d.no_vino=1 THEN 'No vino' ELSE 'Entregado' END AS estado
                    FROM detalle_pedido d JOIN pedidos p ON p.id=d.pedido_id JOIN clientes cl ON cl.id=p.cliente_id
                    WHERE p.campania_id=? ORDER BY p.fecha, cl.nombre`, [cid]);
   const celda = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const csv = '﻿' + ['Fecha;Clienta;Código;Producto;Cantidad;Precio;Subtotal',
-    ...filas.map(f => [f.fecha, f.clienta, f.codigo, f.producto, f.cantidad, f.precio.toFixed(2), f.subtotal.toFixed(2)].map(celda).join(';'))].join('\r\n');
+  const csv = '﻿' + ['Fecha;Clienta;Código;Producto;Cantidad;Precio;Subtotal;Estado',
+    ...filas.map(f => [f.fecha, f.clienta, f.codigo, f.producto, f.cantidad, f.precio.toFixed(2), f.subtotal.toFixed(2), f.estado].map(celda).join(';'))].join('\r\n');
   const nom = q1('SELECT nombre FROM campanias WHERE id=?', [cid]).nombre;
   descargar(`pedidos-${sinTildes(nom).replace(/\s+/g, '-')}.csv`, csv, 'text/csv');
 }
